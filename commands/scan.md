@@ -1,55 +1,67 @@
 ---
 description: Scan codebase for quality issues (TODOs, stubs, mocks, placeholders)
-allowed-tools: Bash
+allowed-tools: Grep, Bash, Read
 ---
 
 # Quality Scan Command
 
 Run a quality scan on the codebase to detect incomplete implementations.
 
-## What It Detects
+## Execution Steps
 
-### Code Comments
-- `TODO`, `FIXME`, `HACK`, `XXX`, `BUG`, `UNDONE`
-- `@todo`, `@fixme` annotations
+### Step 1: Get Changed Files
 
-### Stub Functions
-- `throw new Error('not implemented')`
-- `raise NotImplementedError` (Python)
-- `todo!()`, `unimplemented!()` (Rust)
-- Functions returning `null`, `undefined`, `[]`, `{}`
-- Empty promise returns
-
-### Mock/Placeholder Data
-- Test emails: `test@example.com`, `user@test.com`
-- Fake names: `John Doe`, `Jane Doe`, `Test User`
-- Lorem ipsum text
-- Placeholder URLs: `http://example.com`
-- Placeholder images: `placeholder.png`
-
-### Placeholder Strings
-- `PLACEHOLDER`, `CHANGEME`, `REPLACE_ME`
-- `YOUR_*_HERE` patterns
-- Placeholder API keys
-
-## Execution
-
-Run the quality scanner on changed files (git diff):
+First, get the list of changed files (or scan all source files if no changes):
 
 ```bash
-PLUGIN_DIR=$(ls -td ~/.claude/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | head -1)
-node "${PLUGIN_DIR}dist/commands/scan.js"
+# Get changed files
+git diff --name-only HEAD 2>/dev/null | grep -E '\.(ts|tsx|js|jsx|py|rs|go|java|dart|swift|kt)$'
+
+# If no changes, fall back to status
+git status --porcelain 2>/dev/null | awk '{print $2}' | grep -E '\.(ts|tsx|js|jsx|py|rs|go|java|dart|swift|kt)$'
 ```
 
-## Output Format
+### Step 2: Run Pattern Scans
 
-The scan produces a detailed report:
+Run these Grep searches in parallel on the source directories (typically `src/`, `lib/`, or project root).
+
+**Exclude pattern definition files** like `patterns.ts`, `scanner.ts`, test fixtures, and `node_modules`.
+
+#### TODOs/FIXMEs (Blocking ❌)
+```
+pattern: //\s*(TODO|FIXME|HACK|XXX|BUG|UNDONE):
+```
+
+#### Stub Functions (Blocking ❌)
+```
+pattern: throw\s+new\s+Error\s*\(\s*['"`](not implemented|TODO)
+pattern: raise\s+NotImplementedError
+pattern: todo!\s*\(\)|unimplemented!\s*\(\)
+```
+
+#### Mock Data (Warning ⚠️)
+```
+pattern: test@example\.com|user@test\.com
+pattern: ['"`]John\s+Doe['"`]|['"`]Jane\s+Doe['"`]
+pattern: Lorem\s+ipsum
+pattern: placeholder\.(png|jpg|svg)
+```
+
+#### Placeholders (Warning ⚠️)
+```
+pattern: ['"`](PLACEHOLDER|CHANGEME|REPLACE_ME)['"`]
+pattern: YOUR_[A-Z_]+_HERE
+```
+
+### Step 3: Format Report
+
+Present findings in this format:
 
 ```
 Quality Scan Results
 ====================
 
-Scanned 8 changed files
+Scanned: [directory or file list]
 
 📄 src/auth.ts
   ❌ Line 42: TODO comment found
@@ -58,7 +70,7 @@ Scanned 8 changed files
      throw new Error('not implemented')
 
 📄 src/test/fixtures.ts
-  ⚠️ Line 10: Mock email: test@example.com
+  ⚠️ Line 10: Mock email found
      email: 'test@example.com',
 
 Summary
@@ -76,36 +88,8 @@ Total: 3 issues (2 blocking)
 - **Blocking (❌)**: TODOs and stubs - should be fixed before completion
 - **Warning (⚠️)**: Mocks and placeholders - review if intentional
 
-## Configuration
+## Important Notes
 
-Quality scan settings in `~/.claude/plugins/claude-hud/config.json`:
-
-```json
-{
-  "automation": {
-    "qualityScan": {
-      "enabled": true,
-      "patterns": {
-        "todo": true,
-        "stub": true,
-        "mock": true,
-        "placeholder": true
-      },
-      "exclude": ["test/", "fixtures/"],
-      "treatAsError": ["todo", "stub"]
-    }
-  }
-}
-```
-
-### Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `enabled` | `true` | Enable/disable quality scanning |
-| `patterns.todo` | `true` | Scan for TODO/FIXME comments |
-| `patterns.stub` | `true` | Scan for stub functions |
-| `patterns.mock` | `true` | Scan for mock data |
-| `patterns.placeholder` | `true` | Scan for placeholder strings |
-| `exclude` | `[]` | Glob patterns to skip |
-| `treatAsError` | `["todo", "stub"]` | Categories that block completion |
+- **Exclude pattern definitions**: Files like `patterns.ts` or `scanner.ts` that define the patterns themselves should be excluded from results
+- **Exclude test fixtures**: Test data files are expected to have mock data
+- **Focus on source files**: Only scan code files, not configs or docs
