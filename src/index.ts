@@ -5,7 +5,8 @@ import { countConfigs } from './config-reader.js';
 import { getGitStatus } from './git.js';
 import { getUsage } from './usage-api.js';
 import { loadConfig } from './config.js';
-import type { RenderContext } from './types.js';
+import { findChecklist, parseChecklist, getRequiredUnverifiedItems, getUnverifiedItems } from './hooks/checklist.js';
+import type { RenderContext, ChecklistInfo } from './types.js';
 import { fileURLToPath } from 'node:url';
 
 export type MainDeps = {
@@ -59,6 +60,23 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
 
     const sessionDuration = formatSessionDuration(transcript.sessionStart, deps.now);
 
+    // Find and parse checklist if automation is enabled
+    let checklist: ChecklistInfo | null = null;
+    if (config.automation?.checklist?.enabled !== false) {
+      const cwd = stdin.cwd ?? process.cwd();
+      const checklistPath = findChecklist(cwd, config.automation?.checklist?.paths);
+      if (checklistPath) {
+        const items = parseChecklist(checklistPath);
+        const unverified = getUnverifiedItems(items);
+        const required = getRequiredUnverifiedItems(items);
+        checklist = {
+          path: checklistPath,
+          requiredCount: required.length,
+          optionalCount: unverified.length - required.length,
+        };
+      }
+    }
+
     const ctx: RenderContext = {
       stdin,
       transcript,
@@ -70,6 +88,7 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
       gitStatus,
       usageData,
       config,
+      checklist,
     };
 
     deps.render(ctx);

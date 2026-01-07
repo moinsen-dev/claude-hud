@@ -72,12 +72,13 @@ Claude HUD gives you better insights into what's happening in your Claude Code s
 - **Agent type** and what it's working on
 - **Elapsed time** for each agent
 
-### Todo Progress
+### Todo Progress & Checklist
 ```
-✓ All todos complete (5/5)
+▸ Fix authentication bug (2/5) | 📋 3 required, 2 optional
 ```
 - **Current task** or completion status
 - **Progress counter** (completed/total)
+- **Checklist indicator** — Shows pending verification items from `checklist.md`
 
 ---
 
@@ -215,6 +216,150 @@ To disable usage display, set `display.showUsage` to `false` in your config.
 **Tool/agent/todo lines missing?**
 - These only appear when there's activity to show
 - Check `display.showTools`, `display.showAgents`, `display.showTodos` in config
+
+---
+
+## Automation Features
+
+Claude HUD includes optional automation capabilities that help you work more efficiently.
+
+### Auto-Continue
+
+When enabled, Claude automatically continues working when there are incomplete todos — no more manually saying "yes" to continue.
+
+**Safety features:**
+- Disabled by default (must opt-in)
+- Maximum iteration limit (default: 10) prevents infinite loops
+- Respects Claude Code's `stop_hook_active` flag
+
+### Completion Checklist
+
+When all todos are completed, Claude can automatically run through a verification checklist to ensure quality.
+
+**Checklist format** (`checklist.md`):
+```markdown
+# Completion Checklist
+
+## Required
+- [!] All tests pass
+- [!] No lint errors
+- [!] Build succeeds
+
+## Recommended
+- [ ] Documentation updated
+- [ ] No TODO comments left
+```
+
+- `[!]` — Required items (must pass)
+- `[ ]` — Optional items (good to check)
+- `[x]` — Already verified (skipped)
+
+**Checklist search hierarchy:**
+1. `./checklist.md` (project root)
+2. `./.claude/checklist.md` (project .claude folder)
+3. `~/.claude/checklist.md` (global default)
+
+### Quality Scanner
+
+Automatically detects incomplete code patterns when todos complete:
+
+**What it detects:**
+- **TODOs/FIXMEs** — `TODO`, `FIXME`, `HACK`, `XXX`, `BUG`, `@todo`
+- **Stub functions** — `throw new Error('not implemented')`, `raise NotImplementedError`, `todo!()`, empty returns
+- **Mock data** — `test@example.com`, `John Doe`, `Lorem ipsum`, `http://example.com`
+- **Placeholders** — `PLACEHOLDER`, `CHANGEME`, `YOUR_*_HERE`, fake API keys
+
+**Behavior:**
+- Scans only changed files (via `git diff`) for speed
+- Runs automatically when all todos complete
+- Prompts Claude to fix issues without blocking
+
+**Example output:**
+```
+All 5 todos completed!
+
+⚠️ Quality Issues Found (3 in changed files):
+
+📍 TODOs: 2 found
+  src/auth.ts:42 - TODO: implement password hashing
+  src/api.ts:15 - FIXME: handle rate limiting
+
+🔧 Stubs: 1 found
+  src/auth.ts:50 - Not implemented error thrown
+
+Please fix these issues before marking the task as complete.
+```
+
+**Manual scan:**
+```
+/claude-hud:scan
+```
+
+### Setup Automation
+
+```
+/claude-hud:enable-automation
+```
+
+This interactive command lets you:
+- Enable/disable auto-continue
+- Enable/disable checklist verification
+- Configure the Stop hook in Claude Code
+
+### Create a Checklist
+
+```
+/claude-hud:create-checklist
+```
+
+Choose from templates:
+- **Basic** — General development checks
+- **TypeScript** — TS-specific (tsc, eslint, types)
+- **Flutter** — Flutter checks (analyze, test, build)
+- **Empty** — Start from scratch
+
+### Automation Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `automation.autoContinue.enabled` | boolean | false | Auto-continue when todos incomplete |
+| `automation.autoContinue.maxIterations` | number | 10 | Safety limit for iterations |
+| `automation.checklist.enabled` | boolean | true | Run checklist when todos complete |
+| `automation.checklist.paths` | string[] | [] | Custom checklist search paths |
+| `automation.qualityScan.enabled` | boolean | true | Scan for quality issues |
+| `automation.qualityScan.patterns.todo` | boolean | true | Detect TODO/FIXME comments |
+| `automation.qualityScan.patterns.stub` | boolean | true | Detect stub functions |
+| `automation.qualityScan.patterns.mock` | boolean | true | Detect mock data |
+| `automation.qualityScan.patterns.placeholder` | boolean | true | Detect placeholder strings |
+| `automation.qualityScan.exclude` | string[] | [] | Paths to exclude from scanning |
+| `automation.qualityScan.treatAsError` | string[] | ["todo", "stub"] | Categories that block completion |
+
+**Example config:**
+```json
+{
+  "automation": {
+    "autoContinue": {
+      "enabled": true,
+      "maxIterations": 10
+    },
+    "checklist": {
+      "enabled": true,
+      "paths": []
+    },
+    "qualityScan": {
+      "enabled": true,
+      "patterns": {
+        "todo": true,
+        "stub": true,
+        "mock": true,
+        "placeholder": true
+      },
+      "exclude": ["test/", "fixtures/"],
+      "treatAsError": ["todo", "stub"]
+    }
+  }
+}
+```
 
 ---
 

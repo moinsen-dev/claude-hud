@@ -5,6 +5,7 @@ import { countConfigs } from './config-reader.js';
 import { getGitStatus } from './git.js';
 import { getUsage } from './usage-api.js';
 import { loadConfig } from './config.js';
+import { findChecklist, parseChecklist, getRequiredUnverifiedItems, getUnverifiedItems } from './hooks/checklist.js';
 import { fileURLToPath } from 'node:url';
 export async function main(overrides = {}) {
     const deps = {
@@ -37,6 +38,22 @@ export async function main(overrides = {}) {
             ? await deps.getUsage()
             : null;
         const sessionDuration = formatSessionDuration(transcript.sessionStart, deps.now);
+        // Find and parse checklist if automation is enabled
+        let checklist = null;
+        if (config.automation?.checklist?.enabled !== false) {
+            const cwd = stdin.cwd ?? process.cwd();
+            const checklistPath = findChecklist(cwd, config.automation?.checklist?.paths);
+            if (checklistPath) {
+                const items = parseChecklist(checklistPath);
+                const unverified = getUnverifiedItems(items);
+                const required = getRequiredUnverifiedItems(items);
+                checklist = {
+                    path: checklistPath,
+                    requiredCount: required.length,
+                    optionalCount: unverified.length - required.length,
+                };
+            }
+        }
         const ctx = {
             stdin,
             transcript,
@@ -48,6 +65,7 @@ export async function main(overrides = {}) {
             gitStatus,
             usageData,
             config,
+            checklist,
         };
         deps.render(ctx);
     }

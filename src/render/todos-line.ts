@@ -1,10 +1,18 @@
 import type { RenderContext } from '../types.js';
-import { yellow, green, dim } from './colors.js';
+import { yellow, green, dim, cyan } from './colors.js';
 
 export function renderTodosLine(ctx: RenderContext): string | null {
   const { todos } = ctx.transcript;
+  const { checklist } = ctx;
+
+  // Format checklist info if available
+  const checklistPart = formatChecklistPart(checklist);
 
   if (!todos || todos.length === 0) {
+    // Show checklist even if no todos
+    if (checklistPart) {
+      return checklistPart;
+    }
     return null;
   }
 
@@ -14,15 +22,41 @@ export function renderTodosLine(ctx: RenderContext): string | null {
 
   if (!inProgress) {
     if (completed === total && total > 0) {
-      return `${green('✓')} All todos complete ${dim(`(${completed}/${total})`)}`;
+      const todoPart = `${green('✓')} All todos complete ${dim(`(${completed}/${total})`)}`;
+      return checklistPart ? `${todoPart} ${dim('|')} ${checklistPart}` : todoPart;
+    }
+    // Show checklist even when no in-progress todo
+    if (checklistPart) {
+      return checklistPart;
     }
     return null;
   }
 
   const content = truncateContent(inProgress.content);
   const progress = dim(`(${completed}/${total})`);
+  const todoPart = `${yellow('▸')} ${content} ${progress}`;
 
-  return `${yellow('▸')} ${content} ${progress}`;
+  return checklistPart ? `${todoPart} ${dim('|')} ${checklistPart}` : todoPart;
+}
+
+function formatChecklistPart(checklist: RenderContext['checklist']): string | null {
+  if (!checklist) return null;
+
+  const { requiredCount, optionalCount } = checklist;
+  const total = requiredCount + optionalCount;
+
+  if (total === 0) return null;
+
+  // Format: 📋 3 required, 2 optional
+  const parts: string[] = [];
+  if (requiredCount > 0) {
+    parts.push(`${requiredCount} required`);
+  }
+  if (optionalCount > 0) {
+    parts.push(`${optionalCount} optional`);
+  }
+
+  return `${cyan('📋')} ${dim(parts.join(', '))}`;
 }
 
 function truncateContent(content: string, maxLen: number = 50): string {

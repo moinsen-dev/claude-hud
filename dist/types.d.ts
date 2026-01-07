@@ -1,5 +1,18 @@
 import type { HudConfig } from './config.js';
 import type { GitStatus } from './git.js';
+export type { AutomationConfig } from './config.js';
+export interface StopHookInput {
+    session_id?: string;
+    transcript_path?: string;
+    hook_event_name?: string;
+    stop_hook_active?: boolean;
+    cwd?: string;
+}
+export interface StopHookOutput {
+    continue: boolean;
+    systemMessage?: string;
+    stopReason?: string;
+}
 export interface StdinData {
     transcript_path?: string;
     cwd?: string;
@@ -58,6 +71,11 @@ export interface TranscriptData {
     todos: TodoItem[];
     sessionStart?: Date;
 }
+export interface ChecklistInfo {
+    path: string;
+    requiredCount: number;
+    optionalCount: number;
+}
 export interface RenderContext {
     stdin: StdinData;
     transcript: TranscriptData;
@@ -69,5 +87,6 @@ export interface RenderContext {
     gitStatus: GitStatus | null;
     usageData: UsageData | null;
     config: HudConfig;
+    checklist: ChecklistInfo | null;
 }
 //# sourceMappingURL=types.d.ts.map
