@@ -135,10 +135,10 @@ export async function runStopHook(): Promise<void> {
     const completed = todos.filter((t) => t.status === 'completed');
     const total = todos.length;
 
-    // Case 1: All todos completed - check if we should run quality scan and/or checklist
-    if (total > 0 && pending.length === 0 && inProgress.length === 0) {
+    // Case 1: All todos completed (or no todos) - check if we should run quality scan and/or checklist
+    if (pending.length === 0 && inProgress.length === 0) {
       const cwd = stdin.cwd ?? process.cwd();
-      const messages: string[] = [`All ${total} todos completed!`];
+      const messages: string[] = total > 0 ? [`All ${total} todos completed!`] : [];
       let shouldContinue = false;
 
       // Run quality scan on changed files
@@ -186,7 +186,10 @@ export async function runStopHook(): Promise<void> {
       }
 
       // All done, no issues found
-      outputJson({ continue: false, stopReason: 'All todos completed' });
+      outputJson({
+        continue: false,
+        stopReason: total > 0 ? 'All todos completed' : 'No pending work',
+      });
       return;
     }
 
